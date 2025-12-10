@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ParticleScene from './particles/ParticleScene';
 import ControlPanel from './particles/ControlPanel';
 import Navbar from './components/Navbar';
 import AIWorkflows from './components/AIWorkflows';
+import SpaceSimulation from './components/SpaceSimulation';
 import Services from './components/Services';
 import Portfolio from './components/Portfolio';
 import Contact from './components/Contact';
@@ -21,6 +22,20 @@ const App: React.FC = () => {
         text: 'FKGPT'
     });
 
+    // Track if user is in the hero section (for showing/hiding particle control panel)
+    const [isInHeroSection, setIsInHeroSection] = useState(true);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            // Hide control panel when scrolled past 80% of viewport height
+            const scrollThreshold = window.innerHeight * 0.8;
+            setIsInHeroSection(window.scrollY < scrollThreshold);
+        };
+
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
     return (
         <div className="app">
             <Navbar />
@@ -29,7 +44,7 @@ const App: React.FC = () => {
             <section id="home" className="hero-section">
                 <div className="particle-container">
                     <ParticleScene config={config} />
-                    <ControlPanel config={config} setConfig={setConfig} />
+                    {isInHeroSection && <ControlPanel config={config} setConfig={setConfig} />}
                 </div>
 
                 {/* Floating Logo Only */}
@@ -79,6 +94,8 @@ const App: React.FC = () => {
             </section>
 
             <AIWorkflows />
+
+            <SpaceSimulation />
 
             <Services />
             <Portfolio />

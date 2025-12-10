@@ -62,7 +62,7 @@ const App: React.FC = () => {
             <section className="intro-section">
                 <div className="container">
                     <h1 className="intro-title">FKGPT.DEV</h1>
-                    <p className="intro-subtitle">Full-Stack Developer & AI Solutions Architect</p>
+                    <p className="intro-subtitle">Full-Stack Developer & AI Solutions</p>
                     <p className="intro-description">
                         Transforming ideas into digital reality with cutting-edge web development,
                         hosting solutions, and AI-powered applications.

@@ -1,0 +1,295 @@
+{
+    "name": "Audio Transcription & Analysis (Form)",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "audio-transcription-form",
+                "responseMode": "responseNode",
+                "formTitle": "Audio Transcription & Analysis",
+                "formDescription": "Upload audio files to transcribe and analyze with AI",
+                "formFields": {
+                    "values": [
+                        {
+                            "fieldLabel": "Audio File",
+                            "fieldType": "file",
+                            "requiredField": true,
+                            "acceptFileTypes": ".mp3,.wav,.m4a,.ogg,.flac,.webm"
+                        },
+                        {
+                            "fieldLabel": "Analysis Type",
+                            "fieldType": "dropdown",
+                            "requiredField": true,
+                            "fieldOptions": {
+                                "values": [
+                                    {
+                                        "option": "Full Analysis (Summary + Topics + Action Items)"
+                                    },
+                                    {
+                                        "option": "Transcription Only"
+                                    },
+                                    {
+                                        "option": "Summary Only"
+                                    },
+                                    {
+                                        "option": "Meeting Notes"
+                                    },
+                                    {
+                                        "option": "Key Points Extraction"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "fieldLabel": "AI Model",
+                            "fieldType": "dropdown",
+                            "requiredField": true,
+                            "fieldOptions": {
+                                "values": [
+                                    {
+                                        "option": "llama3.2:3b"
+                                    },
+                                    {
+                                        "option": "llama3.2:1b"
+                                    },
+                                    {
+                                        "option": "llama3.1:8b"
+                                    },
+                                    {
+                                        "option": "qwen2.5:7b"
+                                    },
+                                    {
+                                        "option": "mistral:7b"
+                                    },
+                                    {
+                                        "option": "gemma2:9b"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "form-trigger",
+            "name": "Audio Upload Form",
+            "type": "n8n-nodes-base.formTrigger",
+            "typeVersion": 2.1,
+            "position": [
+                0,
+                300
+            ],
+            "webhookId": "audio-transcription-form"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract form data\nconst formData = $json;\nconst analysisType = formData['Analysis Type'] || 'Full Analysis (Summary + Topics + Action Items)';\nconst model = formData['AI Model'] || 'llama3.2:3b';\n\nreturn [{\n  json: {\n    analysisType: analysisType,\n    model: model,\n    hasFile: !!$binary\n  }\n}];"
+            },
+            "id": "prepare-metadata",
+            "name": "Prepare Metadata",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://whisper:9002/inference",
+                "sendBody": true,
+                "contentType": "multipart-form-data",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "parameterType": "formBinaryData",
+                            "name": "file",
+                            "inputDataFieldName": "={{ Object.keys($binary)[0] }}"
+                        },
+                        {
+                            "parameterType": "formData",
+                            "name": "response_format",
+                            "value": "json"
+                        }
+                    ]
+                },
+                "options": {
+                    "timeout": 300000
+                }
+            },
+            "id": "whisper-transcribe",
+            "name": "Whisper - Transcribe",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                440,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract transcription text\nconst whisperResponse = $json;\nlet transcript = '';\n\ntry {\n  if (whisperResponse.text) {\n    transcript = whisperResponse.text;\n  } else if (typeof whisperResponse === 'string') {\n    transcript = whisperResponse;\n  } else {\n    transcript = JSON.stringify(whisperResponse);\n  }\n} catch (e) {\n  transcript = 'Error: ' + e.message;\n}\n\nconst prevData = $('Prepare Metadata').first().json;\n\nreturn [{\n  json: {\n    transcript: transcript,\n    analysisType: prevData.analysisType,\n    model: prevData.model,\n    raw_response: whisperResponse\n  }\n}];"
+            },
+            "id": "extract-transcript",
+            "name": "Extract Transcript",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                660,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Build analysis prompt based on type\nconst data = $json;\nconst analysisType = data.analysisType;\nconst transcript = data.transcript;\nconst model = data.model;\n\nconst prompts = {\n  'Full Analysis (Summary + Topics + Action Items)': 'Analyze this transcript and provide: 1) A brief summary 2) Key topics discussed 3) Action items if any 4) Sentiment analysis',\n  'Transcription Only': 'Clean up and format this transcript for readability. Fix any obvious transcription errors.',\n  'Summary Only': 'Provide a concise summary of this transcript in 2-3 paragraphs.',\n  'Meeting Notes': 'Format this as professional meeting notes with: Attendees (if mentioned), Key Discussion Points, Decisions Made, Action Items with owners if specified.',\n  'Key Points Extraction': 'Extract the key points and important information from this transcript as a bulleted list.'\n};\n\nconst systemPrompt = prompts[analysisType] || prompts['Full Analysis (Summary + Topics + Action Items)'];\n\nreturn [{\n  json: {\n    transcript: transcript,\n    analysisType: analysisType,\n    model: model,\n    llm_payload: {\n      model: model,\n      messages: [\n        { role: 'system', content: 'You are an expert at analyzing audio transcripts. ' + systemPrompt },\n        { role: 'user', content: 'Analyze this transcript:\\n\\n' + transcript }\n      ]\n    }\n  }\n}];"
+            },
+            "id": "build-prompt",
+            "name": "Build Analysis Prompt",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                880,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://llm_api:8000/v1/chat/completions",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json.llm_payload) }}",
+                "options": {
+                    "timeout": 600000
+                }
+            },
+            "id": "llm-analyze",
+            "name": "LLM - Analyze Transcript",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const llmResponse = $json;\nlet analysis = '';\n\ntry {\n  if (llmResponse.choices && llmResponse.choices[0]) {\n    analysis = llmResponse.choices[0].message.content;\n  } else if (llmResponse[0] && llmResponse[0].choices) {\n    analysis = llmResponse[0].choices[0].message.content;\n  } else {\n    analysis = JSON.stringify(llmResponse);\n  }\n} catch (e) {\n  analysis = 'Error: ' + e.message;\n}\n\nconst prevData = $('Build Analysis Prompt').first().json;\n\n// Format nice HTML response\nconst htmlResult = `\n<!DOCTYPE html>\n<html>\n<head>\n  <title>Audio Transcription Result</title>\n  <meta charset=\"UTF-8\">\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; background: #1a1a2e; color: #eee; }\n    h1 { color: #00d9ff; }\n    h2 { color: #00ff88; margin-top: 30px; }\n    .meta { background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 20px; }\n    .meta span { display: inline-block; margin-right: 20px; }\n    .label { color: #888; }\n    .transcript { background: #0f3460; padding: 20px; border-radius: 8px; white-space: pre-wrap; line-height: 1.6; max-height: 300px; overflow-y: auto; }\n    .analysis { background: #16213e; padding: 20px; border-radius: 8px; white-space: pre-wrap; line-height: 1.6; }\n    a { color: #00d9ff; }\n  </style>\n</head>\n<body>\n  <h1>🎤 Audio Transcription & Analysis</h1>\n  <div class=\"meta\">\n    <span><span class=\"label\">Analysis Type:</span> ${prevData.analysisType}</span>\n    <span><span class=\"label\">Model:</span> ${prevData.model}</span>\n  </div>\n  <h2>📝 Transcript</h2>\n  <div class=\"transcript\">${prevData.transcript.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>\n  <h2>🔍 Analysis</h2>\n  <div class=\"analysis\">${analysis.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>\n  <p style=\"margin-top: 20px;\"><a href=\"javascript:history.back()\">← Upload another audio</a></p>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    transcript: prevData.transcript,\n    analysis: analysis,\n    html: htmlResult,\n    processed_at: new Date().toISOString()\n  }\n}];"
+            },
+            "id": "format-response",
+            "name": "Format Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1320,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "={{ $json.html }}",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Content-Type",
+                                "value": "text/html; charset=utf-8"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "respond",
+            "name": "Respond with HTML",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1540,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Audio Upload Form": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Metadata",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Metadata": {
+            "main": [
+                [
+                    {
+                        "node": "Whisper - Transcribe",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Whisper - Transcribe": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Transcript",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Transcript": {
+            "main": [
+                [
+                    {
+                        "node": "Build Analysis Prompt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Analysis Prompt": {
+            "main": [
+                [
+                    {
+                        "node": "LLM - Analyze Transcript",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "LLM - Analyze Transcript": {
+            "main": [
+                [
+                    {
+                        "node": "Format Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Response": {
+            "main": [
+                [
+                    {
+                        "node": "Respond with HTML",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

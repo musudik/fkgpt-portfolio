@@ -1,0 +1,215 @@
+{
+    "name": "AI Chatbot (Form)",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "chatbot-form",
+                "responseMode": "responseNode",
+                "formTitle": "AI Chatbot",
+                "formDescription": "Chat with AI - ask questions, get help, have conversations",
+                "formFields": {
+                    "values": [
+                        {
+                            "fieldLabel": "Model",
+                            "fieldType": "dropdown",
+                            "requiredField": true,
+                            "fieldOptions": {
+                                "values": [
+                                    {
+                                        "option": "llama3.2:3b"
+                                    },
+                                    {
+                                        "option": "llama3.2:1b"
+                                    },
+                                    {
+                                        "option": "llama3.1:8b"
+                                    },
+                                    {
+                                        "option": "llama3.1:70b"
+                                    },
+                                    {
+                                        "option": "qwen2.5-coder:7b"
+                                    },
+                                    {
+                                        "option": "qwen2.5-coder:14b"
+                                    },
+                                    {
+                                        "option": "qwen2.5:7b"
+                                    },
+                                    {
+                                        "option": "qwen2.5:14b"
+                                    },
+                                    {
+                                        "option": "mistral:7b"
+                                    },
+                                    {
+                                        "option": "mixtral:8x7b"
+                                    },
+                                    {
+                                        "option": "codellama:7b"
+                                    },
+                                    {
+                                        "option": "codellama:13b"
+                                    },
+                                    {
+                                        "option": "deepseek-coder:6.7b"
+                                    },
+                                    {
+                                        "option": "phi3:mini"
+                                    },
+                                    {
+                                        "option": "gemma2:9b"
+                                    },
+                                    {
+                                        "option": "gemma2:27b"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "fieldLabel": "System Prompt (optional)",
+                            "fieldType": "textarea",
+                            "requiredField": false,
+                            "placeholder": "Define the AI's personality or role (e.g., 'You are a helpful coding assistant')"
+                        },
+                        {
+                            "fieldLabel": "Your Message",
+                            "fieldType": "textarea",
+                            "requiredField": true,
+                            "placeholder": "Type your message here..."
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "form-trigger",
+            "name": "Chatbot Form",
+            "type": "n8n-nodes-base.formTrigger",
+            "typeVersion": 2.1,
+            "position": [
+                0,
+                300
+            ],
+            "webhookId": "chatbot-form"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Parse form input\nconst formData = $json;\n\nconst model = formData['Model'] || 'llama3.2:3b';\nconst systemPrompt = formData['System Prompt (optional)'] || 'You are a helpful AI assistant.';\nconst message = formData['Your Message'] || '';\n\n// Build messages array\nconst messages = [\n  { role: 'system', content: systemPrompt },\n  { role: 'user', content: message }\n];\n\nreturn [{\n  json: {\n    model: model,\n    messages: messages,\n    userMessage: message,\n    systemPrompt: systemPrompt\n  }\n}];"
+            },
+            "id": "prepare-request",
+            "name": "Prepare Request",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                260,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://llm_api:8000/v1/chat/completions",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": {{ JSON.stringify($json.model) }},\n  \"messages\": {{ JSON.stringify($json.messages) }}\n}",
+                "options": {
+                    "timeout": 600000
+                }
+            },
+            "id": "llm-chat",
+            "name": "LLM API - Chat",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                480,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const llmResponse = $json;\nlet reply = '';\n\ntry {\n  if (llmResponse.choices && llmResponse.choices[0]) {\n    reply = llmResponse.choices[0].message.content;\n  } else if (llmResponse[0] && llmResponse[0].choices) {\n    reply = llmResponse[0].choices[0].message.content;\n  } else {\n    reply = JSON.stringify(llmResponse);\n  }\n} catch (e) {\n  reply = 'Error generating response: ' + e.message;\n}\n\nconst prevData = $('Prepare Request').first().json;\n\n// Format nice HTML response\nconst htmlResult = `\n<!DOCTYPE html>\n<html>\n<head>\n  <title>AI Chatbot Response</title>\n  <meta charset=\"UTF-8\">\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; background: #1a1a2e; color: #eee; }\n    h1 { color: #00d9ff; }\n    .meta { background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 20px; }\n    .meta span { display: inline-block; margin-right: 20px; }\n    .label { color: #888; }\n    .user-msg { background: #0f3460; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #00d9ff; }\n    .ai-response { background: #16213e; padding: 20px; border-radius: 8px; white-space: pre-wrap; line-height: 1.6; border-left: 4px solid #00ff88; }\n    a { color: #00d9ff; }\n  </style>\n</head>\n<body>\n  <h1>🤖 AI Chatbot</h1>\n  <div class=\"meta\">\n    <span><span class=\"label\">Model:</span> ${prevData.model}</span>\n  </div>\n  <div class=\"user-msg\"><strong>You:</strong> ${prevData.userMessage.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>\n  <div class=\"ai-response\"><strong>AI:</strong>\\n\\n${reply.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>\n  <p style=\"margin-top: 20px;\"><a href=\"javascript:history.back()\">← Ask another question</a></p>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    reply: reply,\n    model: prevData.model,\n    userMessage: prevData.userMessage,\n    html: htmlResult\n  }\n}];"
+            },
+            "id": "format-response",
+            "name": "Format Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "={{ $json.html }}",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Content-Type",
+                                "value": "text/html; charset=utf-8"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "respond",
+            "name": "Respond with HTML",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                920,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Chatbot Form": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Request",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Request": {
+            "main": [
+                [
+                    {
+                        "node": "LLM API - Chat",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "LLM API - Chat": {
+            "main": [
+                [
+                    {
+                        "node": "Format Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Response": {
+            "main": [
+                [
+                    {
+                        "node": "Respond with HTML",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

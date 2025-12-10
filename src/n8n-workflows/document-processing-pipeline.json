@@ -1,0 +1,314 @@
+{
+    "name": "AI Document Processor (Form)",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "document-processor-form",
+                "responseMode": "responseNode",
+                "formTitle": "AI Document Processor",
+                "formDescription": "Upload documents (images/PDFs) for OCR text extraction and AI analysis",
+                "formFields": {
+                    "values": [
+                        {
+                            "fieldLabel": "Document File",
+                            "fieldType": "file",
+                            "requiredField": true,
+                            "acceptFileTypes": ".jpg,.jpeg,.png,.gif,.bmp,.tiff,.pdf,.webp"
+                        },
+                        {
+                            "fieldLabel": "OCR Engine",
+                            "fieldType": "dropdown",
+                            "requiredField": true,
+                            "fieldOptions": {
+                                "values": [
+                                    {
+                                        "option": "Tesseract (Fast)"
+                                    },
+                                    {
+                                        "option": "EasyOCR (Accurate)"
+                                    },
+                                    {
+                                        "option": "Both Engines"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "fieldLabel": "Analysis Task",
+                            "fieldType": "dropdown",
+                            "requiredField": true,
+                            "fieldOptions": {
+                                "values": [
+                                    {
+                                        "option": "Full Analysis (Summary + Key Info + Type)"
+                                    },
+                                    {
+                                        "option": "Text Extraction Only"
+                                    },
+                                    {
+                                        "option": "Data Extraction (Tables, Numbers)"
+                                    },
+                                    {
+                                        "option": "Invoice/Receipt Processing"
+                                    },
+                                    {
+                                        "option": "Business Card Parsing"
+                                    },
+                                    {
+                                        "option": "Form Field Extraction"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "fieldLabel": "AI Model",
+                            "fieldType": "dropdown",
+                            "requiredField": true,
+                            "fieldOptions": {
+                                "values": [
+                                    {
+                                        "option": "llama3.2:3b"
+                                    },
+                                    {
+                                        "option": "llama3.2:1b"
+                                    },
+                                    {
+                                        "option": "llama3.1:8b"
+                                    },
+                                    {
+                                        "option": "qwen2.5:7b"
+                                    },
+                                    {
+                                        "option": "qwen2.5-coder:7b"
+                                    },
+                                    {
+                                        "option": "mistral:7b"
+                                    },
+                                    {
+                                        "option": "gemma2:9b"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "form-trigger",
+            "name": "Document Upload Form",
+            "type": "n8n-nodes-base.formTrigger",
+            "typeVersion": 2.1,
+            "position": [
+                0,
+                300
+            ],
+            "webhookId": "document-processor-form"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract form data\nconst formData = $json;\nconst ocrEngine = formData['OCR Engine'] || 'Tesseract (Fast)';\nconst analysisTask = formData['Analysis Task'] || 'Full Analysis (Summary + Key Info + Type)';\nconst model = formData['AI Model'] || 'llama3.2:3b';\n\n// Map OCR engine to endpoint\nconst ocrEndpoints = {\n  'Tesseract (Fast)': 'http://vision_api:8501/ocr/tesseract',\n  'EasyOCR (Accurate)': 'http://vision_api:8501/ocr/easyocr',\n  'Both Engines': 'http://vision_api:8501/ocr/all'\n};\n\nreturn [{\n  json: {\n    ocrEngine: ocrEngine,\n    ocrEndpoint: ocrEndpoints[ocrEngine] || ocrEndpoints['Tesseract (Fast)'],\n    analysisTask: analysisTask,\n    model: model\n  }\n}];"
+            },
+            "id": "prepare-metadata",
+            "name": "Prepare Metadata",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                220,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $json.ocrEndpoint }}",
+                "sendBody": true,
+                "contentType": "multipart-form-data",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "parameterType": "formBinaryData",
+                            "name": "file",
+                            "inputDataFieldName": "={{ Object.keys($('Document Upload Form').first().binary)[0] }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "timeout": 120000
+                }
+            },
+            "id": "vision-ocr",
+            "name": "Vision API - OCR",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                440,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract OCR text\nconst ocrResult = $json;\nlet extractedText = '';\n\ntry {\n  if (ocrResult.text) {\n    extractedText = ocrResult.text;\n  } else if (ocrResult.tesseract && ocrResult.easyocr) {\n    extractedText = 'Tesseract:\\n' + ocrResult.tesseract + '\\n\\nEasyOCR:\\n' + ocrResult.easyocr;\n  } else if (typeof ocrResult === 'string') {\n    extractedText = ocrResult;\n  } else {\n    extractedText = JSON.stringify(ocrResult);\n  }\n} catch (e) {\n  extractedText = 'Error: ' + e.message;\n}\n\nconst prevData = $('Prepare Metadata').first().json;\n\nreturn [{\n  json: {\n    ocr_text: extractedText,\n    ocrEngine: prevData.ocrEngine,\n    analysisTask: prevData.analysisTask,\n    model: prevData.model\n  }\n}];"
+            },
+            "id": "extract-text",
+            "name": "Extract OCR Text",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                660,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Build analysis prompt based on task type\nconst data = $json;\nconst analysisTask = data.analysisTask;\nconst ocrText = data.ocr_text;\nconst model = data.model;\n\nconst prompts = {\n  'Full Analysis (Summary + Key Info + Type)': 'Analyze this extracted text and provide: 1) A brief summary, 2) Key information found, 3) Document type if identifiable.',\n  'Text Extraction Only': 'Clean up and format this OCR-extracted text for readability. Fix obvious OCR errors.',\n  'Data Extraction (Tables, Numbers)': 'Extract all numerical data, tables, and structured information from this text. Format as organized data.',\n  'Invoice/Receipt Processing': 'Extract invoice/receipt information: Vendor, Date, Items with prices, Subtotal, Tax, Total, Payment method if shown.',\n  'Business Card Parsing': 'Extract contact information: Name, Title, Company, Phone numbers, Email, Address, Website.',\n  'Form Field Extraction': 'Identify and extract all form fields with their values. Present as field: value pairs.'\n};\n\nconst systemPrompt = prompts[analysisTask] || prompts['Full Analysis (Summary + Key Info + Type)'];\n\nreturn [{\n  json: {\n    ocr_text: ocrText,\n    ocrEngine: data.ocrEngine,\n    analysisTask: analysisTask,\n    model: model,\n    llm_payload: {\n      model: model,\n      messages: [\n        { role: 'system', content: 'You are a helpful document analysis assistant. ' + systemPrompt },\n        { role: 'user', content: 'Analyze this extracted text:\\n\\n' + ocrText }\n      ]\n    }\n  }\n}];"
+            },
+            "id": "build-prompt",
+            "name": "Build Analysis Prompt",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                880,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://llm_api:8000/v1/chat/completions",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json.llm_payload) }}",
+                "options": {
+                    "timeout": 600000
+                }
+            },
+            "id": "llm-analyze",
+            "name": "LLM API - Analyze",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract analysis from LLM response\nconst llmResponse = $json;\nlet analysis = '';\n\ntry {\n  if (llmResponse.choices && llmResponse.choices[0]) {\n    analysis = llmResponse.choices[0].message.content;\n  } else if (Array.isArray(llmResponse) && llmResponse[0] && llmResponse[0].choices) {\n    analysis = llmResponse[0].choices[0].message.content;\n  } else {\n    analysis = JSON.stringify(llmResponse);\n  }\n} catch (e) {\n  analysis = 'Error extracting analysis: ' + e.message;\n}\n\nconst prevData = $('Build Analysis Prompt').first().json;\n\n// Format nice HTML response\nconst htmlResult = `\n<!DOCTYPE html>\n<html>\n<head>\n  <title>Document Processing Result</title>\n  <meta charset=\"UTF-8\">\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; background: #1a1a2e; color: #eee; }\n    h1 { color: #00d9ff; }\n    h2 { color: #00ff88; margin-top: 30px; }\n    .meta { background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 20px; }\n    .meta span { display: inline-block; }\n    .label { color: #888; }\n    .ocr-text { background: #0f3460; padding: 20px; border-radius: 8px; white-space: pre-wrap; line-height: 1.6; max-height: 300px; overflow-y: auto; font-family: monospace; }\n    .analysis { background: #16213e; padding: 20px; border-radius: 8px; white-space: pre-wrap; line-height: 1.6; }\n    a { color: #00d9ff; }\n  </style>\n</head>\n<body>\n  <h1>📄 AI Document Processor</h1>\n  <div class=\"meta\">\n    <span><span class=\"label\">OCR Engine:</span> ${prevData.ocrEngine}</span>\n    <span><span class=\"label\">Task:</span> ${prevData.analysisTask}</span>\n    <span><span class=\"label\">Model:</span> ${prevData.model}</span>\n  </div>\n  <h2>📝 Extracted Text (OCR)</h2>\n  <div class=\"ocr-text\">${prevData.ocr_text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>\n  <h2>🔍 AI Analysis</h2>\n  <div class=\"analysis\">${analysis.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>\n  <p style=\"margin-top: 20px;\"><a href=\"javascript:history.back()\">← Process another document</a></p>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    status: 'success',\n    ocr_text: prevData.ocr_text,\n    analysis: analysis,\n    html: htmlResult,\n    processed_at: new Date().toISOString()\n  }\n}];"
+            },
+            "id": "format-response",
+            "name": "Format Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1320,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "={{ $json.html }}",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Content-Type",
+                                "value": "text/html; charset=utf-8"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "respond-webhook",
+            "name": "Respond with HTML",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                1540,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Document Upload Form": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Metadata",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Metadata": {
+            "main": [
+                [
+                    {
+                        "node": "Vision API - OCR",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Vision API - OCR": {
+            "main": [
+                [
+                    {
+                        "node": "Extract OCR Text",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract OCR Text": {
+            "main": [
+                [
+                    {
+                        "node": "Build Analysis Prompt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Analysis Prompt": {
+            "main": [
+                [
+                    {
+                        "node": "LLM API - Analyze",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "LLM API - Analyze": {
+            "main": [
+                [
+                    {
+                        "node": "Format Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Response": {
+            "main": [
+                [
+                    {
+                        "node": "Respond with HTML",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

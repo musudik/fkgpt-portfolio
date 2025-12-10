@@ -1,0 +1,173 @@
+{
+    "name": "MinIO File Processor",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 5
+                        }
+                    ]
+                }
+            },
+            "id": "schedule-trigger",
+            "name": "Check Every 5 Minutes",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.1,
+            "position": [
+                0,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "GET",
+                "url": "http://minio:9000/documents",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpBasicAuth",
+                "options": {}
+            },
+            "id": "list-minio-bucket",
+            "name": "List MinIO Bucket",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                220,
+                300
+            ],
+            "notes": "Note: Configure S3 credentials in n8n credentials page"
+        },
+        {
+            "parameters": {
+                "jsCode": "// This is a placeholder - in real implementation, use S3 node\n// with MinIO endpoint http://minio:9000\n// Access Key: admin, Secret Key: password\n\nconst files = $json.Contents || [];\n\n// Filter for unprocessed files (could check a metadata flag)\nconst unprocessedFiles = files.filter(file => {\n  return file.Key && (file.Key.endsWith('.jpg') || file.Key.endsWith('.png') || file.Key.endsWith('.pdf'));\n});\n\nreturn unprocessedFiles.map(file => ({\n  json: {\n    key: file.Key,\n    size: file.Size,\n    lastModified: file.LastModified\n  }\n}));"
+            },
+            "id": "filter-files",
+            "name": "Filter Unprocessed Files",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                440,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://vision_api:8501/image-to-text",
+                "sendBody": true,
+                "contentType": "multipart-form-data",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "parameterType": "formBinaryData",
+                            "name": "file",
+                            "inputDataFieldName": "data"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "process-ocr",
+            "name": "Vision API - Process",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                660,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://llm_api:8000/v1/chat/completions",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"llama3.2:3b\",\n  \"messages\": [\n    {\"role\": \"system\", \"content\": \"Extract and structure the key information from this document text. Return as JSON with fields: title, date, summary, key_points (array), entities (people, organizations mentioned).\"},\n    {\"role\": \"user\", \"content\": {{ JSON.stringify($json.tesseract + '\\n' + $json.easyocr) }}}\n  ]\n}",
+                "options": {}
+            },
+            "id": "structure-data",
+            "name": "LLM - Structure Data",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                880,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Store result back to MinIO as JSON\nconst llmResponse = $json;\nlet structuredData = {};\n\ntry {\n  const content = llmResponse.choices[0].message.content;\n  // Try to parse as JSON, otherwise store as text\n  try {\n    structuredData = JSON.parse(content);\n  } catch {\n    structuredData = { raw_analysis: content };\n  }\n} catch (e) {\n  structuredData = { error: e.message };\n}\n\nreturn [{\n  json: {\n    originalFile: $('Filter Unprocessed Files').first().json.key,\n    processedAt: new Date().toISOString(),\n    structuredData: structuredData\n  }\n}];"
+            },
+            "id": "prepare-output",
+            "name": "Prepare Output",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1100,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Check Every 5 Minutes": {
+            "main": [
+                [
+                    {
+                        "node": "List MinIO Bucket",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "List MinIO Bucket": {
+            "main": [
+                [
+                    {
+                        "node": "Filter Unprocessed Files",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter Unprocessed Files": {
+            "main": [
+                [
+                    {
+                        "node": "Vision API - Process",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Vision API - Process": {
+            "main": [
+                [
+                    {
+                        "node": "LLM - Structure Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "LLM - Structure Data": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

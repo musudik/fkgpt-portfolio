@@ -1,0 +1,245 @@
+{
+    "name": "AI Code Assistant (Form)",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "code-assistant-form",
+                "responseMode": "responseNode",
+                "formTitle": "AI Code Assistant",
+                "formDescription": "Generate, review, explain, or refactor code using AI",
+                "formFields": {
+                    "values": [
+                        {
+                            "fieldLabel": "Action",
+                            "fieldType": "dropdown",
+                            "requiredField": true,
+                            "fieldOptions": {
+                                "values": [
+                                    {
+                                        "option": "Generate Code"
+                                    },
+                                    {
+                                        "option": "Review Code"
+                                    },
+                                    {
+                                        "option": "Explain Code"
+                                    },
+                                    {
+                                        "option": "Refactor Code"
+                                    },
+                                    {
+                                        "option": "Fix/Debug Code"
+                                    },
+                                    {
+                                        "option": "Generate Tests"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "fieldLabel": "Programming Language",
+                            "fieldType": "dropdown",
+                            "requiredField": true,
+                            "fieldOptions": {
+                                "values": [
+                                    {
+                                        "option": "Python"
+                                    },
+                                    {
+                                        "option": "JavaScript"
+                                    },
+                                    {
+                                        "option": "TypeScript"
+                                    },
+                                    {
+                                        "option": "React"
+                                    },
+                                    {
+                                        "option": "Java"
+                                    },
+                                    {
+                                        "option": "C#"
+                                    },
+                                    {
+                                        "option": "Go"
+                                    },
+                                    {
+                                        "option": "Rust"
+                                    },
+                                    {
+                                        "option": "PHP"
+                                    },
+                                    {
+                                        "option": "Ruby"
+                                    },
+                                    {
+                                        "option": "SQL"
+                                    },
+                                    {
+                                        "option": "Docker"
+                                    },
+                                    {
+                                        "option": "Kubernetes"
+                                    },
+                                    {
+                                        "option": "AWS"
+                                    },
+                                    {
+                                        "option": "Terraform"
+                                    },
+                                    {
+                                        "option": "Bash/Shell"
+                                    },
+                                    {
+                                        "option": "Other"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "fieldLabel": "Your Prompt / Description",
+                            "fieldType": "textarea",
+                            "requiredField": true,
+                            "placeholder": "Describe what you want to generate, or provide context for reviewing/explaining code..."
+                        },
+                        {
+                            "fieldLabel": "Code (paste your code here if reviewing/explaining/refactoring)",
+                            "fieldType": "textarea",
+                            "requiredField": false,
+                            "placeholder": "Paste your code here (optional for generate action)..."
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "form-trigger",
+            "name": "Code Assistant Form",
+            "type": "n8n-nodes-base.formTrigger",
+            "typeVersion": 2.1,
+            "position": [
+                0,
+                300
+            ],
+            "webhookId": "code-assistant-form"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Parse form input\nconst formData = $json;\n\n// Map form action to code action\nconst actionMap = {\n  'Generate Code': 'generate',\n  'Review Code': 'review',\n  'Explain Code': 'explain',\n  'Refactor Code': 'refactor',\n  'Fix/Debug Code': 'fix',\n  'Generate Tests': 'test'\n};\n\nconst action = actionMap[formData['Action']] || 'generate';\nconst language = formData['Programming Language'] || 'Python';\nconst description = formData['Your Prompt / Description'] || '';\nconst code = formData['Code (paste your code here if reviewing/explaining/refactoring)'] || '';\n\n// Build system prompts based on action\nconst systemPrompts = {\n  generate: `You are an expert ${language} programmer. Generate clean, well-documented, production-ready code based on the user's requirements. Include comments explaining key parts.`,\n  \n  review: `You are a senior ${language} code reviewer. Analyze the provided code and give detailed feedback on:\n1. Code quality and best practices\n2. Potential bugs or issues\n3. Performance concerns\n4. Security vulnerabilities\n5. Suggestions for improvement\nBe constructive and specific.`,\n  \n  explain: `You are a patient ${language} programming teacher. Explain the provided code in detail:\n1. What the code does overall\n2. Break down each section/function\n3. Explain any complex logic\n4. Mention any patterns or techniques used\nUse simple language suitable for learners.`,\n  \n  refactor: `You are an expert at clean code and ${language} best practices. Refactor the provided code to:\n1. Improve readability\n2. Follow best practices and design patterns\n3. Reduce complexity\n4. Improve maintainability\nProvide the refactored code with comments explaining the changes.`,\n  \n  fix: `You are a ${language} debugging expert. Analyze the provided code and:\n1. Identify the bugs or issues\n2. Explain what's causing the problem\n3. Provide the corrected code\n4. Explain what was fixed and why`,\n  \n  test: `You are a ${language} testing expert. For the provided code:\n1. Write comprehensive unit tests\n2. Include edge cases\n3. Use appropriate testing framework\n4. Add comments explaining what each test verifies`\n};\n\nconst systemPrompt = systemPrompts[action] || systemPrompts.generate;\n\n// Build user message\nlet userMessage = '';\nif (action === 'generate') {\n  userMessage = `Language: ${language}\\n\\nRequirement: ${description}`;\n} else {\n  userMessage = `Language: ${language}\\n\\n`;\n  if (description) {\n    userMessage += `Context: ${description}\\n\\n`;\n  }\n  if (code) {\n    userMessage += `Code:\\n\\`\\`\\`${language.toLowerCase()}\\n${code}\\n\\`\\`\\``;\n  }\n}\n\n// Build LLM payload\nconst llmPayload = {\n  model: 'qwen2.5-coder:7b',\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userMessage }\n  ]\n};\n\nreturn [{\n  json: {\n    action: action,\n    language: language,\n    original_code: code,\n    description: description,\n    llm_payload: llmPayload\n  }\n}];"
+            },
+            "id": "prepare-request",
+            "name": "Prepare Code Request",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                260,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://llm_api:8000/v1/chat/completions",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json.llm_payload) }}",
+                "options": {
+                    "timeout": 600000
+                }
+            },
+            "id": "llm-code",
+            "name": "LLM - Code Assistant",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                500,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Extract the response from LLM\nconst llmResponse = $json;\nlet result = '';\n\ntry {\n  if (llmResponse.choices && llmResponse.choices[0]) {\n    result = llmResponse.choices[0].message.content;\n  } else if (Array.isArray(llmResponse) && llmResponse[0] && llmResponse[0].choices) {\n    result = llmResponse[0].choices[0].message.content;\n  } else {\n    result = JSON.stringify(llmResponse);\n  }\n} catch (e) {\n  result = 'Error: ' + e.message;\n}\n\nconst prevData = $('Prepare Code Request').first().json;\n\n// Format nice HTML response\nconst htmlResult = `\n<!DOCTYPE html>\n<html>\n<head>\n  <title>Code Assistant Result</title>\n  <meta charset=\"UTF-8\">\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; background: #1a1a2e; color: #eee; }\n    h1 { color: #00d9ff; }\n    .meta { background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 20px; }\n    .meta span { display: inline-block; margin-right: 20px; }\n    .label { color: #888; }\n    pre { background: #0f0f23; padding: 20px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; white-space: pre-wrap; word-wrap: break-word; }\n    code { color: #00ff88; }\n    .result { background: #16213e; padding: 20px; border-radius: 8px; white-space: pre-wrap; line-height: 1.6; }\n    a { color: #00d9ff; }\n  </style>\n</head>\n<body>\n  <h1>🤖 AI Code Assistant</h1>\n  <div class=\"meta\">\n    <span><span class=\"label\">Action:</span> ${prevData.action}</span>\n    <span><span class=\"label\">Language:</span> ${prevData.language}</span>\n  </div>\n  <div class=\"result\">${result.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>\n  <p style=\"margin-top: 20px;\"><a href=\"javascript:history.back()\">← Back to form</a></p>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    status: 'success',\n    action: prevData.action,\n    language: prevData.language,\n    result: result,\n    html: htmlResult,\n    processed_at: new Date().toISOString()\n  }\n}];"
+            },
+            "id": "format-response",
+            "name": "Format Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                720,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "text",
+                "responseBody": "={{ $json.html }}",
+                "options": {
+                    "responseHeaders": {
+                        "entries": [
+                            {
+                                "name": "Content-Type",
+                                "value": "text/html; charset=utf-8"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "respond",
+            "name": "Respond with HTML",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                940,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Code Assistant Form": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Code Request",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Code Request": {
+            "main": [
+                [
+                    {
+                        "node": "LLM - Code Assistant",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "LLM - Code Assistant": {
+            "main": [
+                [
+                    {
+                        "node": "Format Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format Response": {
+            "main": [
+                [
+                    {
+                        "node": "Respond with HTML",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    }
+}

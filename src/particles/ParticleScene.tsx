@@ -29,8 +29,8 @@ const sampleTextParticles = (text: string, fontSize: number = 100): THREE.Vector
         for (let x = 0; x < canvas.width; x += step) {
             const alpha = data[(y * canvas.width + x) * 4 + 3];
             if (alpha > 128) {
-                const px = (x - canvas.width / 2) * 0.05;
-                const py = -(y - canvas.height / 2) * 0.05;
+                const px = (x - canvas.width / 2) * 0.100;
+                const py = -(y - canvas.height / 2) * 0.100;
                 points.push(new THREE.Vector3(px, py, 0));
             }
         }

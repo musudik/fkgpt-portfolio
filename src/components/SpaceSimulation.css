@@ -920,7 +920,7 @@
 
 .camera-controls {
     position: absolute;
-    top: 50px;
+    top: 150px;
     right: 15px;
     display: flex;
     flex-direction: column;
@@ -963,4 +963,21 @@
     border-color: #00ffff;
     color: #00ffff;
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.zoom-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 4px 0;
+}
+
+.cam-btn.zoom-btn {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.cam-btn.zoom-btn:hover {
+    background: rgba(139, 92, 246, 0.25);
+    border-color: #8b5cf6;
+    color: #8b5cf6;
 }

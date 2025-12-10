@@ -530,7 +530,8 @@ const SpaceSimulation: React.FC = () => {
     const [showLabels, setShowLabels] = useState(true);
     const [showOrbits, setShowOrbits] = useState(true);
     const [showInfo, setShowInfo] = useState(true);
-    const [cameraView, setCameraView] = useState<'top' | 'side' | 'angle'>('top');
+    const [cameraView, setCameraView] = useState<'top' | 'side' | 'angle'>('side');
+    const [zoomLevel, setZoomLevel] = useState(1);
     const controlsRef = useRef<any>(null);
 
     // Calculate Present Day (days from July 1, 2025)
@@ -540,12 +541,16 @@ const SpaceSimulation: React.FC = () => {
         return Math.round((today.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
     }, []);
 
-    // Camera position presets
+    // Camera position presets (side view from behind the comet trajectory)
     const cameraPositions = {
-        top: [0, 25, 0.1] as [number, number, number],
-        side: [25, 2, 0] as [number, number, number],
-        angle: [15, 12, 15] as [number, number, number]
+        top: [0, 25 / zoomLevel, 0.1] as [number, number, number],
+        side: [-8 / zoomLevel, 5 / zoomLevel, -15 / zoomLevel] as [number, number, number],
+        angle: [15 / zoomLevel, 12 / zoomLevel, 15 / zoomLevel] as [number, number, number]
     };
+
+    // Zoom handlers
+    const zoomIn = () => setZoomLevel(prev => Math.min(prev * 1.3, 5));
+    const zoomOut = () => setZoomLevel(prev => Math.max(prev / 1.3, 0.3));
 
     // Animation loop for time progression
     const lastTimeRef = useRef(Date.now());
@@ -658,7 +663,6 @@ const SpaceSimulation: React.FC = () => {
 
                     {/* Camera View Controls - Top Right */}
                     <div className="camera-controls">
-                        <br />
                         <button
                             className={`cam-btn ${cameraView === 'top' ? 'active' : ''}`}
                             onClick={() => setCameraView('top')}
@@ -679,6 +683,21 @@ const SpaceSimulation: React.FC = () => {
                             title="3D Angle View"
                         >
                             <i className="fas fa-cube"></i>
+                        </button>
+                        <div className="zoom-divider"></div>
+                        <button
+                            className="cam-btn zoom-btn"
+                            onClick={zoomIn}
+                            title="Zoom In"
+                        >
+                            <i className="fas fa-plus"></i>
+                        </button>
+                        <button
+                            className="cam-btn zoom-btn"
+                            onClick={zoomOut}
+                            title="Zoom Out"
+                        >
+                            <i className="fas fa-minus"></i>
                         </button>
                     </div>
                 </div>

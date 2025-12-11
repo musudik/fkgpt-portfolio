@@ -203,23 +203,23 @@ When calling services from n8n, use these internal Docker URLs:
 📡 Quick Test Commands
 1. Document Processing (OCR + Analysis)
 ```
-curl -X POST http://207.180.235.87:5678/webhook/process-document \
+curl -X POST https://n8n.fkgpt.dev/webhook/process-document \
   -F "data=@image.jpg"
 ```  
 2. Audio Transcription
 ```
-curl -X POST http://207.180.235.87:5678/webhook/transcribe-audio \
+curl -X POST https://n8n.fkgpt.dev/webhook/transcribe-audio \
   -F "data=@audio.mp3"
 ```  
 3. AI Chatbot
 ```
-curl -X POST http://207.180.235.87:5678/webhook/chat \
+curl -X POST https://n8n.fkgpt.dev/webhook/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello, how are you?"}'
 ```  
 4. Code Assistant
 ```
-curl -X POST http://207.180.235.87:5678/webhook/code-assistant \
+curl -X POST https://n8n.fkgpt.dev/webhook/code-assistant \
   -H "Content-Type: application/json" \
   -d '{
     "action": "generate",
@@ -235,10 +235,10 @@ Checks MinIO for new files and processes them
 
 # Workflow	Form URL
 
-**AI Chatbot**	http://207.180.235.87:5678/form/chatbot-form
-**Audio Transcription**	http://207.180.235.87:5678/form/audio-transcription-form
-**Document Processor**	http://207.180.235.87:5678/form/document-processor-form
-**Code Assistant**	http://207.180.235.87:5678/form/code-assistant-form
+**AI Chatbot**	https://n8n.fkgpt.dev/form/chatbot-form
+**Audio Transcription**	https://n8n.fkgpt.dev/form/audio-transcription-form
+**Document Processor**	https://n8n.fkgpt.dev/form/document-processor-form
+**Code Assistant**	https://n8n.fkgpt.dev/form/code-assistant-form
 
 # Updated Files
 

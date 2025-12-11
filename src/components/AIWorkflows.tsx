@@ -10,7 +10,7 @@ interface WorkflowTab {
     formUrl: string;
 }
 
-const BASE_URL = 'http://207.180.235.87:5678';
+const BASE_URL = 'https://n8n.fkgpt.dev';
 
 const WORKFLOWS: WorkflowTab[] = [
     {

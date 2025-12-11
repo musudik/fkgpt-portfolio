@@ -30,7 +30,7 @@ export default defineConfig({
     server: {
         proxy: {
             '/api/n8n': {
-                target: 'http://207.180.235.87:5678',
+                target: 'https://n8n.fkgpt.dev',
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/api\/n8n/, '/webhook'),
                 timeout: 600000, // 10 minute timeout for long-running AI requests

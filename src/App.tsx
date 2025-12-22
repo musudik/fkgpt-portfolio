@@ -9,6 +9,7 @@ import Portfolio from './components/Portfolio';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import GDPRConsent from './components/GDPRConsent';
+import VoiceAssistant from './components/VoiceAssistant';
 import { ParticleConfig } from './types';
 
 const App: React.FC = () => {
@@ -92,6 +93,8 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </section>
+
+            <VoiceAssistant />
 
             <AIWorkflows />
 

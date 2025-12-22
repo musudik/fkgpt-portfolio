@@ -42,7 +42,12 @@ declare global {
     }
 }
 
-const VoiceAssistant: React.FC = () => {
+interface VoiceAssistantProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ isOpen, onClose }) => {
     const [state, setState] = useState<AssistantState>('idle');
     const [messages, setMessages] = useState<Message[]>([]);
     const [transcript, setTranscript] = useState('');
@@ -100,7 +105,6 @@ const VoiceAssistant: React.FC = () => {
 
         recognition.onend = () => {
             if (state === 'listening') {
-                // Restart if still supposed to be listening
                 try {
                     recognition.start();
                 } catch (e) {
@@ -116,7 +120,6 @@ const VoiceAssistant: React.FC = () => {
         recognitionRef.current = recognition;
         synthRef.current = window.speechSynthesis;
 
-        // Check microphone permission
         if (navigator.permissions) {
             navigator.permissions.query({ name: 'microphone' as PermissionName })
                 .then(result => {
@@ -125,9 +128,7 @@ const VoiceAssistant: React.FC = () => {
                         setMicPermission(result.state as 'granted' | 'denied' | 'prompt');
                     };
                 })
-                .catch(() => {
-                    // Permission API not supported
-                });
+                .catch(() => { });
         }
 
         return () => {
@@ -135,10 +136,30 @@ const VoiceAssistant: React.FC = () => {
         };
     }, []);
 
+    // Stop recognition when modal closes
+    useEffect(() => {
+        if (!isOpen && recognitionRef.current) {
+            recognitionRef.current.stop();
+            setState('idle');
+        }
+    }, [isOpen]);
+
     // Auto-scroll messages
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    // Prevent body scroll when modal is open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isOpen]);
 
     const handleUserMessage = useCallback(async (text: string) => {
         const userMessage: Message = {
@@ -150,8 +171,6 @@ const VoiceAssistant: React.FC = () => {
 
         setMessages((prev: Message[]) => [...prev, userMessage]);
         setState('processing');
-
-        // Stop listening while processing
         recognitionRef.current?.stop();
 
         try {
@@ -169,10 +188,8 @@ const VoiceAssistant: React.FC = () => {
 
             const data = await response.json();
 
-            // Parse the response - handle cases where n8n returns raw template or actual output
             let assistantText = '';
             if (data.status) {
-                // Check if it's a raw n8n template (workflow not properly processing)
                 if (data.status.includes('$json.output') || data.status.includes('{{')) {
                     assistantText = 'The AI agent is currently being configured. Please try again later.';
                 } else {
@@ -196,8 +213,6 @@ const VoiceAssistant: React.FC = () => {
             };
 
             setMessages((prev: Message[]) => [...prev, assistantMessage]);
-
-            // Speak the response
             speakText(assistantText);
 
         } catch (error) {
@@ -215,8 +230,6 @@ const VoiceAssistant: React.FC = () => {
 
     const speakText = (text: string) => {
         if (!synthRef.current) return;
-
-        // Cancel any ongoing speech
         synthRef.current.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
@@ -249,7 +262,7 @@ const VoiceAssistant: React.FC = () => {
 
     const getStateLabel = () => {
         switch (state) {
-            case 'idle': return 'Click to speak';
+            case 'idle': return 'Tap to speak';
             case 'listening': return 'Listening...';
             case 'processing': return 'Processing...';
             case 'speaking': return 'Speaking...';
@@ -258,129 +271,152 @@ const VoiceAssistant: React.FC = () => {
         }
     };
 
-    if (!isSupported) {
-        return (
-            <section id="voice-assistant" className="voice-assistant-section">
-                <div className="container">
-                    <h2 className="section-title">
-                        <i className="fas fa-microphone-alt"></i> AI Voice Assistant
-                    </h2>
-                    <div className="voice-not-supported">
-                        <i className="fas fa-exclamation-triangle"></i>
-                        <p>Voice recognition is not supported in your browser. Please use Chrome, Edge, or Safari.</p>
-                    </div>
-                </div>
-            </section>
-        );
-    }
+    const handleOverlayClick = (e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) {
+            onClose();
+        }
+    };
+
+    if (!isOpen) return null;
 
     return (
-        <section id="voice-assistant" className="voice-assistant-section">
-            <div className="container">
-                <h2 className="section-title">
-                    <i className="fas fa-microphone-alt"></i> AI Voice Assistant
-                </h2>
-                <p className="section-description">
-                    Talk with our AI assistant using voice commands. Book appointments, ask questions, or get information about our services.
-                </p>
+        <div className="voice-modal-overlay" onClick={handleOverlayClick}>
+            <div className="voice-modal-backdrop"></div>
 
-                <div className="voice-assistant-container">
-                    {/* Waveform Visualization */}
-                    <div className={`voice-waveform ${state === 'listening' ? 'active' : ''} ${state === 'speaking' ? 'speaking' : ''}`}>
-                        <div className="wave-bar"></div>
-                        <div className="wave-bar"></div>
-                        <div className="wave-bar"></div>
-                        <div className="wave-bar"></div>
-                        <div className="wave-bar"></div>
+            <div className="voice-modal">
+                {/* Animated Background */}
+                <div className="voice-modal-bg">
+                    <div className="gradient-orb orb-1"></div>
+                    <div className="gradient-orb orb-2"></div>
+                    <div className="gradient-orb orb-3"></div>
+                    <div className="gradient-orb orb-4"></div>
+                </div>
+
+                {/* Close Button */}
+                <button className="voice-modal-close" onClick={onClose} aria-label="Close">
+                    <i className="fas fa-times"></i>
+                </button>
+
+                {/* Modal Content */}
+                <div className="voice-modal-content">
+                    {/* Header */}
+                    <div className="voice-modal-header">
+                        <div className="voice-modal-icon">
+                            <i className="fas fa-robot"></i>
+                        </div>
+                        <h2>AI Voice Assistant</h2>
+                        <p>Speak naturally, I'm here to help</p>
                     </div>
 
-                    {/* Microphone Button */}
-                    <button
-                        className={`mic-button ${state}`}
-                        onClick={toggleListening}
-                        disabled={state === 'processing' || state === 'speaking'}
-                        aria-label={getStateLabel()}
-                    >
-                        <div className="mic-button-inner">
-                            {state === 'processing' ? (
-                                <i className="fas fa-spinner fa-spin"></i>
-                            ) : state === 'speaking' ? (
-                                <i className="fas fa-volume-up"></i>
-                            ) : (
-                                <i className="fas fa-microphone"></i>
-                            )}
+                    {!isSupported ? (
+                        <div className="voice-not-supported">
+                            <i className="fas fa-exclamation-triangle"></i>
+                            <p>Voice recognition is not supported in your browser. Please use Chrome, Edge, or Safari.</p>
                         </div>
-                        <div className="mic-pulse"></div>
-                        <div className="mic-pulse delay"></div>
-                    </button>
-
-                    {/* Status Label */}
-                    <div className="voice-status">
-                        <span className={`status-indicator ${state}`}></span>
-                        <span className="status-text">{getStateLabel()}</span>
-                    </div>
-
-                    {/* Live Transcript (while listening) */}
-                    {transcript && (
-                        <div className="live-transcript">
-                            <i className="fas fa-quote-left"></i>
-                            {transcript}
-                        </div>
-                    )}
-
-                    {/* Permission Notice */}
-                    {micPermission === 'denied' && (
-                        <div className="mic-permission-notice">
-                            <i className="fas fa-exclamation-circle"></i>
-                            <span>Microphone access denied. Please enable it in your browser settings.</span>
-                        </div>
-                    )}
-
-                    {/* Conversation History */}
-                    {messages.length > 0 && (
-                        <div className="voice-messages">
-                            <h4>Conversation</h4>
-                            <div className="messages-container">
-                                {messages.map(msg => (
-                                    <div key={msg.id} className={`voice-message ${msg.type}`}>
-                                        <div className="message-icon">
-                                            {msg.type === 'user' ? (
-                                                <i className="fas fa-user"></i>
-                                            ) : (
-                                                <i className="fas fa-robot"></i>
-                                            )}
-                                        </div>
-                                        <div className="message-content">
-                                            <p>{msg.text}</p>
-                                            <span className="message-time">
-                                                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                                <div ref={messagesEndRef} />
+                    ) : (
+                        <>
+                            {/* Waveform Visualization */}
+                            <div className={`voice-waveform-modal ${state === 'listening' ? 'active' : ''} ${state === 'speaking' ? 'speaking' : ''}`}>
+                                <div className="wave-bar"></div>
+                                <div className="wave-bar"></div>
+                                <div className="wave-bar"></div>
+                                <div className="wave-bar"></div>
+                                <div className="wave-bar"></div>
+                                <div className="wave-bar"></div>
+                                <div className="wave-bar"></div>
                             </div>
-                        </div>
-                    )}
 
-                    {/* Quick Actions */}
-                    <div className="voice-quick-actions">
-                        <span className="quick-action-label">Try saying:</span>
-                        <div className="quick-actions-list">
-                            <button onClick={() => handleUserMessage("What services do you offer?")}>
-                                "What services do you offer?"
+                            {/* Microphone Button */}
+                            <button
+                                className={`mic-button-modal ${state}`}
+                                onClick={toggleListening}
+                                disabled={state === 'processing' || state === 'speaking'}
+                                aria-label={getStateLabel()}
+                            >
+                                <div className="mic-button-glow"></div>
+                                <div className="mic-button-ring"></div>
+                                <div className="mic-button-inner-modal">
+                                    {state === 'processing' ? (
+                                        <i className="fas fa-spinner fa-spin"></i>
+                                    ) : state === 'speaking' ? (
+                                        <i className="fas fa-volume-up"></i>
+                                    ) : (
+                                        <i className="fas fa-microphone"></i>
+                                    )}
+                                </div>
+                                <div className="mic-ripple"></div>
+                                <div className="mic-ripple delay-1"></div>
+                                <div className="mic-ripple delay-2"></div>
                             </button>
-                            <button onClick={() => handleUserMessage("Book an appointment")}>
-                                "Book an appointment"
-                            </button>
-                            <button onClick={() => handleUserMessage("Tell me about web development")}>
-                                "Tell me about web development"
-                            </button>
-                        </div>
-                    </div>
+
+                            {/* Status Label */}
+                            <div className="voice-status-modal">
+                                <span className={`status-dot ${state}`}></span>
+                                <span className="status-label">{getStateLabel()}</span>
+                            </div>
+
+                            {/* Live Transcript */}
+                            {transcript && (
+                                <div className="live-transcript-modal">
+                                    <i className="fas fa-quote-left"></i>
+                                    <span>{transcript}</span>
+                                </div>
+                            )}
+
+                            {/* Permission Notice */}
+                            {micPermission === 'denied' && (
+                                <div className="mic-permission-notice-modal">
+                                    <i className="fas fa-exclamation-circle"></i>
+                                    <span>Microphone access denied. Please enable it in your browser settings.</span>
+                                </div>
+                            )}
+
+                            {/* Conversation History */}
+                            {messages.length > 0 && (
+                                <div className="voice-messages-modal">
+                                    <div className="messages-scroll">
+                                        {messages.map(msg => (
+                                            <div key={msg.id} className={`voice-message-modal ${msg.type}`}>
+                                                <div className="message-avatar">
+                                                    {msg.type === 'user' ? (
+                                                        <i className="fas fa-user"></i>
+                                                    ) : (
+                                                        <i className="fas fa-robot"></i>
+                                                    )}
+                                                </div>
+                                                <div className="message-bubble">
+                                                    <p>{msg.text}</p>
+                                                    <span className="message-timestamp">
+                                                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div ref={messagesEndRef} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Quick Actions */}
+                            <div className="voice-quick-actions-modal">
+                                <button onClick={() => handleUserMessage("What services do you offer?")}>
+                                    <i className="fas fa-concierge-bell"></i>
+                                    Services
+                                </button>
+                                <button onClick={() => handleUserMessage("Book an appointment")}>
+                                    <i className="fas fa-calendar-plus"></i>
+                                    Book
+                                </button>
+                                <button onClick={() => handleUserMessage("Tell me about web development")}>
+                                    <i className="fas fa-code"></i>
+                                    Web Dev
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
-        </section>
+        </div>
     );
 };
 

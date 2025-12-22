@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+    onVoiceClick?: () => void;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ onVoiceClick }) => {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -14,7 +18,6 @@ const Navbar: React.FC = () => {
 
     const navLinks = [
         { href: '#home', label: 'Home' },
-        { href: '#voice-assistant', label: 'AI Voice' },
         { href: '#ai-workflows', label: 'AI Workflows' },
         { href: '#space', label: '3I/Atlas' },
         { href: '#services', label: 'Services' },
@@ -40,6 +43,17 @@ const Navbar: React.FC = () => {
                             {link.label}
                         </a>
                     ))}
+                    {/* AI Voice as special button */}
+                    <button
+                        className="nav-voice-btn"
+                        onClick={() => {
+                            setIsMobileMenuOpen(false);
+                            onVoiceClick?.();
+                        }}
+                    >
+                        <i className="fas fa-microphone-alt"></i>
+                        <span>AI Voice</span>
+                    </button>
                 </div>
 
                 <button

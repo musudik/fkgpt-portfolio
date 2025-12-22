@@ -26,6 +26,9 @@ const App: React.FC = () => {
     // Track if user is in the hero section (for showing/hiding particle control panel)
     const [isInHeroSection, setIsInHeroSection] = useState(true);
 
+    // Voice Assistant modal state
+    const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false);
+
     useEffect(() => {
         const handleScroll = () => {
             // Hide control panel when scrolled past 80% of viewport height
@@ -39,7 +42,7 @@ const App: React.FC = () => {
 
     return (
         <div className="app">
-            <Navbar />
+            <Navbar onVoiceClick={() => setIsVoiceAssistantOpen(true)} />
 
             {/* Hero Section - Particle System Only */}
             <section id="home" className="hero-section">
@@ -94,8 +97,6 @@ const App: React.FC = () => {
                 </div>
             </section>
 
-            <VoiceAssistant />
-
             <AIWorkflows />
 
             <SpaceSimulation />
@@ -107,9 +108,26 @@ const App: React.FC = () => {
 
             {/* GDPR Cookie Consent */}
             <GDPRConsent />
+
+            {/* Voice Assistant Modal */}
+            <VoiceAssistant
+                isOpen={isVoiceAssistantOpen}
+                onClose={() => setIsVoiceAssistantOpen(false)}
+            />
+
+            {/* Floating Voice Assistant Button */}
+            <button
+                className="voice-fab"
+                onClick={() => setIsVoiceAssistantOpen(true)}
+                aria-label="Open AI Voice Assistant"
+            >
+                <div className="voice-fab-pulse"></div>
+                <div className="voice-fab-icon">
+                    <i className="fas fa-microphone-alt"></i>
+                </div>
+            </button>
         </div>
     );
 };
 
 export default App;
-
